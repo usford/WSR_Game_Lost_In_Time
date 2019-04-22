@@ -6,18 +6,24 @@ using System;
 
 public class Character : MonoBehaviour
 {
-    [SerializeField]
     private int gold = 0;
     [SerializeField]
     private float speed = 3.0f;
     [SerializeField]
-    private float timeSpeed = 4.5f;
+    private float timeSpeed = 1f;
     [SerializeField]
     private float sliderSec = 4;
+
 
     private Rigidbody2D rigibody;
     private SpriteRenderer sprite;
     private GameObject slider;
+
+    private bool isReversing = false; //Включена ли перемотка
+    private ArrayList playerPositions; //Позиция игрока для перемотки
+    private ArrayList playerFlip; //Направление игрока для перемотки
+    private Image imageTimeController; //Эффект перемотки
+
 
     List<Vector3> lines = new List<Vector3>(); //Создание веторов для отмотки времени
     List<bool> flipesX = new List<bool>(); //Считывание направление игрока для отмотки времени
@@ -25,44 +31,55 @@ public class Character : MonoBehaviour
     private bool isStairs = false; //Находится ли персонаж возле лестницы
     private bool isTrumplet = false; //Находится ли персонаж возле трубы
 
-    private float time;
-    private float time2;
-    private int indexLines = 9;
+    private bool fullSlider; //Проверка на заполненность слайдера
+
+    private float time = 0;
+    private int indexLines = 9; //Количество созданных векторов
 
     private void Awake()
     {
         rigibody = GetComponent<Rigidbody2D>();
         sprite = GetComponentInChildren<SpriteRenderer>();
-        time = 0;
         slider = GameObject.Find("Slider");
+
+        playerPositions = new ArrayList();
+        playerFlip = new ArrayList();
+
+        imageTimeController = GameObject.Find("Image_TimeController").GetComponent<Image>();
+        imageTimeController.enabled = true;
     }
+
+    private void FixedUpdate()
+    {
+        if (!isReversing)
+        {
+            playerPositions.Add(transform.position);
+            playerFlip.Add(sprite.flipX);
+        }
+        else if (isReversing && fullSlider && playerPositions.Count != 0)
+        {
+            transform.position = (Vector3)playerPositions[playerPositions.Count - 1];
+            sprite.flipX = (bool)playerFlip[playerFlip.Count - 1];
+
+            playerPositions.RemoveAt(playerPositions.Count - 1);
+            playerFlip.RemoveAt(playerFlip.Count - 1);
+        }
+
+        if (playerPositions.Count > 250)
+        {
+            playerPositions.RemoveAt(0);
+            playerFlip.RemoveAt(0);
+        }
+    }
+
     private void Update()
     {
-        if (Input.GetButton("Horizontal")) Run();
-        if (Input.GetButton("Vertical") && (isStairs == true || isTrumplet == true)) Climb();
-        if (Input.GetButton("Fire1")) { BackTime(); } else { RegenirationTime(); };
-        //if (Input.GetKeyDown(KeyCode.Space)) transform.position = Vector3.MoveTowards(transform.position, lines[0], speed * Time.deltaTime);
-        time += Time.deltaTime;
-        time2 += Time.deltaTime;
-        if (time > 0.33F && !Input.GetButton("Fire1"))
-        {
-            CreateLines();
-            time = 0;
-            Debug.Log("Создали вектор");
-        }
-        //Debug.Log(time2);
-
+        isReversing = Input.GetButton("Fire1");
+        if (Input.GetButton("Horizontal") && !isReversing) Run();
+        if (Input.GetButton("Vertical") && !isReversing && (isStairs == true || isTrumplet == true)) Climb();
+        if (Input.GetButton("Fire1") && fullSlider) { BackTime();} else { RegenirationTime(); };
     }
 
-    private void CreateLines()
-    {
-        if (lines.Count == 10)
-        {
-            lines.RemoveAt(0);
-        }
-        lines.Add(new Vector3(transform.position.x, transform.position.y, transform.position.z));
-        flipesX.Add(sprite.flipX);
-    }
 
     /// <summary>
     /// Передвижение влево-вправо
@@ -74,6 +91,7 @@ public class Character : MonoBehaviour
         transform.position = Vector3.MoveTowards(transform.position, transform.position + direction, speed * Time.deltaTime);
 
         sprite.flipX = direction.x > 0.0F;
+
 
     }
     /// <summary>
@@ -95,28 +113,31 @@ public class Character : MonoBehaviour
         }
     }
 
-    //Перемотка времени
+    /// <summary>
+    /// Перемотка времени
+    /// </summary>
     private void BackTime()
     {
         slider.GetComponent<Slider>().value = slider.GetComponent<Slider>().value - Time.deltaTime * timeSpeed;
 
-        transform.position = Vector3.MoveTowards(transform.position, lines[indexLines], speed * Time.deltaTime);
-        sprite.flipX = flipesX[indexLines];
-        Debug.Log(transform.position + "::::::::::::::::" + lines[indexLines] + ":::::::::::::::::" + flipesX[indexLines]);
-        if (transform.position == lines[indexLines])
+        if (slider.GetComponent<Slider>().value == 0)
         {
-            lines.RemoveAt(indexLines);
-            flipesX.RemoveAt(indexLines);
-            indexLines--;
+            fullSlider = false;
         }
 
-       
+        imageTimeController.enabled = true;
     }
 
-    //Восстановление времени
+    /// <summary>
+    /// Восстановление времени
+    /// </summary>
     private void RegenirationTime()
     {
         slider.GetComponent<Slider>().value = slider.GetComponent<Slider>().value + Time.deltaTime * timeSpeed;
+
+        fullSlider = (slider.GetComponent<Slider>().value == sliderSec);
+
+        imageTimeController.enabled = false;
     }
 
 
